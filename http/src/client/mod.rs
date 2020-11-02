@@ -8,6 +8,7 @@ use crate::{
     error::{Error, Result, UrlError},
     ratelimiting::{RatelimitHeaders, Ratelimiter},
     request::{
+        applications::{CreateGuildCommand, GetGuildCommands},
         channel::message::allowed_mentions::AllowedMentions,
         guild::{create_guild::CreateGuildError, create_guild_channel::CreateGuildChannelError},
         prelude::*,
@@ -15,6 +16,8 @@ use crate::{
     },
     API_VERSION,
 };
+use twilight_model::id::ApplicationId;
+
 use bytes::Bytes;
 use reqwest::{
     header::{HeaderValue, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT},
@@ -112,6 +115,36 @@ pub struct Client {
 }
 
 impl Client {
+    /* New Stuff Start */
+    pub fn create_guild_command(
+        &self,
+        application_id: ApplicationId,
+        guild_id: GuildId,
+        name: impl Into<String>,
+        description: impl Into<String>,
+    ) -> CreateGuildCommand<'_> {
+        CreateGuildCommand::new(
+            &self,
+            application_id,
+            guild_id,
+            name.into(),
+            description.into(),
+        )
+    }
+
+    pub fn get_guild_commands(
+        &self,
+        application_id: ApplicationId,
+        guild_id: GuildId,
+    ) -> GetGuildCommands<'_> {
+        GetGuildCommands::new(
+            &self,
+            application_id,
+            guild_id,
+        )
+    }
+
+    /* New Stuff End   */
     /// Create a new client with a token.
     ///
     /// If you want to customize the client, use [`builder`].
