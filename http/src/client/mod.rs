@@ -17,6 +17,7 @@ use crate::{
         prelude::*,
         GetUserApplicationInfo, Request,
     },
+    request::applications::InteractionsCallback,
     API_VERSION,
 };
 use twilight_model::id::{ApplicationId, CommandId};
@@ -38,8 +39,10 @@ use std::{
 };
 use twilight_model::{
     guild::Permissions,
-    id::{ChannelId, EmojiId, GuildId, IntegrationId, MessageId, RoleId, UserId, WebhookId},
+    id::{ChannelId, EmojiId, GuildId, IntegrationId, InteractionId, MessageId, RoleId, UserId, WebhookId},
 };
+use twilight_model::applications::InteractionResponse;
+
 use url::Url;
 
 struct State {
@@ -119,6 +122,20 @@ pub struct Client {
 
 impl Client {
     /* New Stuff Start */
+    pub fn interactions_callback(
+        &self,
+        interaction_id: InteractionId,
+        interaction_token: impl Into<String>,
+        response: InteractionResponse,
+    ) -> InteractionsCallback<'_> {
+        InteractionsCallback::new(
+            &self,
+            interaction_id,
+            interaction_token.into(),
+            response,
+        )
+    }
+    
     pub fn create_guild_command(
         &self,
         application_id: ApplicationId,
