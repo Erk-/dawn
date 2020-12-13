@@ -121,7 +121,9 @@ mod tests {
             joined_at: None,
             mute: true,
             nick: Some("member nick".to_owned()),
+            permissions: None,
             roles: Vec::new(),
+            user: None,
         };
 
         assert_eq!(cached_member(), &member);

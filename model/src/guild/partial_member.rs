@@ -1,4 +1,4 @@
-use crate::{id::RoleId, user::User, guild::Permissions};
+use crate::{guild::Permissions, id::RoleId, user::User};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -9,7 +9,7 @@ pub struct PartialMember {
     pub nick: Option<String>,
     pub permissions: Option<Permissions>,
     pub roles: Vec<RoleId>,
-    pub user: Option<User>
+    pub user: Option<User>,
 }
 
 #[cfg(test)]
@@ -24,7 +24,9 @@ mod tests {
             joined_at: Some("timestamp".to_owned()),
             mute: true,
             nick: Some("a nickname".to_owned()),
+            permissions: None,
             roles: vec![RoleId(1)],
+            user: None,
         };
 
         serde_test::assert_tokens(
@@ -32,7 +34,7 @@ mod tests {
             &[
                 Token::Struct {
                     name: "PartialMember",
-                    len: 5,
+                    len: 7,
                 },
                 Token::Str("deaf"),
                 Token::Bool(false),
@@ -44,11 +46,15 @@ mod tests {
                 Token::Str("nick"),
                 Token::Some,
                 Token::Str("a nickname"),
+                Token::Str("permissions"),
+                Token::None,
                 Token::Str("roles"),
                 Token::Seq { len: Some(1) },
                 Token::NewtypeStruct { name: "RoleId" },
                 Token::Str("1"),
                 Token::SeqEnd,
+                Token::Str("user"),
+                Token::None,
                 Token::StructEnd,
             ],
         );
