@@ -15,6 +15,11 @@ mod get_global_commands;
 mod set_global_commands;
 mod update_global_command;
 
+mod get_guild_commands_permission;
+mod get_guild_command_permission;
+mod update_guild_command_permission;
+mod set_guild_commands_permission;
+
 mod interaction_callback;
 
 pub use create_guild_command::CreateGuildCommand;
@@ -28,6 +33,11 @@ pub use delete_global_command::DeleteGlobalCommand;
 pub use get_global_commands::GetGlobalCommands;
 pub use set_global_commands::SetGlobalCommands;
 pub use update_global_command::UpdateGlobalCommand;
+
+pub use get_guild_commands_permission::GetGuildCommandsPermissions;
+pub use get_guild_command_permission::GetGuildCommandPermissions;
+pub use update_guild_command_permission::UpdateGuildCommandPermissions;
+pub use set_guild_commands_permission::SetGuildCommandsPermissions;
 
 pub use interaction_callback::InteractionCallback;
 

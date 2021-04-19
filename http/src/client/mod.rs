@@ -2,24 +2,7 @@ mod builder;
 
 pub use self::builder::ClientBuilder;
 
-use crate::{
-    api_error::{ApiError, ErrorCode},
-    error::{Error, Result},
-    ratelimiting::{RatelimitHeaders, Ratelimiter},
-    request::applications::InteractionCallback,
-    request::{
-        applications::{
-            CreateGlobalCommand, CreateGuildCommand, DeleteGlobalCommand, DeleteGuildCommand,
-            GetGlobalCommands, GetGuildCommands, InteractionError, SetGlobalCommands,
-            SetGuildCommands, UpdateGlobalCommand, UpdateGuildCommand,
-        },
-        channel::allowed_mentions::AllowedMentions,
-        guild::{create_guild::CreateGuildError, create_guild_channel::CreateGuildChannelError},
-        prelude::*,
-        GetUserApplicationInfo, Request,
-    },
-    API_VERSION,
-};
+use crate::{API_VERSION, api_error::{ApiError, ErrorCode}, error::{Error, Result}, ratelimiting::{RatelimitHeaders, Ratelimiter}, request::applications::InteractionCallback, request::{GetUserApplicationInfo, Request, applications::{CreateGlobalCommand, CreateGuildCommand, DeleteGlobalCommand, DeleteGuildCommand, GetGlobalCommands, GetGuildCommandPermissions, GetGuildCommands, GetGuildCommandsPermissions, InteractionError, SetGlobalCommands, SetGuildCommands, SetGuildCommandsPermissions, UpdateGlobalCommand, UpdateGuildCommand, UpdateGuildCommandPermissions}, channel::allowed_mentions::AllowedMentions, guild::{create_guild::CreateGuildError, create_guild_channel::CreateGuildChannelError}, prelude::*}};
 
 use bytes::Bytes;
 use hyper::{
@@ -42,7 +25,7 @@ use std::{
 use tokio::time;
 
 use twilight_model::{
-    applications::{command::Command, response::InteractionResponse},
+    applications::{command::{Command, GuildCommandPermissions}, response::InteractionResponse},
     guild::Permissions,
     id::{
         ApplicationId, ChannelId, CommandId, EmojiId, GuildId, IntegrationId, InteractionId,
@@ -1677,6 +1660,28 @@ impl Client {
         commands: Vec<Command>,
     ) -> Result<SetGlobalCommands<'_>, InteractionError> {
         SetGlobalCommands::new(&self, self.application_id(), commands)
+    }
+
+    /// Fetch permissions for a specific command in a guild.
+    pub fn get_guild_command_permissions(&self, guild_id: GuildId, command_id: CommandId) -> Result<GetGuildCommandPermissions<'_>, InteractionError> {
+        GetGuildCommandPermissions::new(&self, self.application_id(), guild_id, command_id)
+    }
+
+    /// Fetch permissions for all commands in a guild.
+    pub fn get_guild_commands_permissions(&self, guild_id: GuildId) -> Result<GetGuildCommandsPermissions<'_>, InteractionError> {
+        GetGuildCommandsPermissions::new(&self, self.application_id(), guild_id)
+    }
+
+    /// Edit permissions for a specific command for your application in a guild.
+    pub fn update_guild_command_permissions(&self, guild_id: GuildId, command_id: CommandId) -> Result<UpdateGuildCommandPermissions<'_>, InteractionError> {
+        UpdateGuildCommandPermissions::new(&self, self.application_id(), guild_id, command_id)
+    }
+
+    /// Set permissions for all commands in a guild
+    ///
+    /// Note: This will overwrite all existing permissions for all commands in a guild
+    pub fn set_guild_commands_permissions(&self, guild_id: GuildId, commands_permissions: Vec<GuildCommandPermissions>) -> Result<SetGuildCommandsPermissions<'_>, InteractionError> {
+        SetGuildCommandsPermissions::new(&self, self.application_id(), guild_id, commands_permissions)
     }
 
     /// Execute a request, returning the response.

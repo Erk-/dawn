@@ -13,6 +13,8 @@ struct UpdateGlobalCommandFields {
     name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     options: Option<Vec<CommandOption>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_permission: Option<bool>,
 }
 
 /// Edit a global command, by ID.
@@ -56,6 +58,13 @@ impl<'a> UpdateGlobalCommand<'a> {
     /// Edit the description of the command.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.fields.description = Some(description.into());
+
+        self
+    }
+
+    /// Edit the default permission of the command
+    pub fn default_permission(mut self, default_permission: bool) -> Self {
+        self.fields.default_permission = Some(default_permission);
 
         self
     }

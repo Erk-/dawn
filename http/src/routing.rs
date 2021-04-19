@@ -601,6 +601,22 @@ pub enum Route {
         /// The ID of the guild.
         guild_id: u64,
     },
+    /// Route information to get permissions for a specific guild command
+    GetGuildCommandPermissions {
+        /// The ID of the owner application.
+        application_id: u64,
+        /// The ID of the guild.
+        guild_id: u64,
+        /// The ID of the command.
+        command_id: u64
+    },
+    /// Route information to get permissions for all guild commands
+    GetGuildCommandsPermissions {
+        /// The ID of the owner application.
+        application_id: u64,
+        /// The ID of the guild.
+        guild_id: u64,
+    },
     /// Route information to get a guild's widget.
     GetGuildWidget {
         /// The ID of the guild.
@@ -797,6 +813,13 @@ pub enum Route {
         /// The ID of the guild.
         guild_id: u64,
     },
+    /// Route information to set permissions of guild commands.
+    SetGuildCommandsPermissions {
+        /// The ID of the owner application.
+        application_id: u64,
+        /// The ID of the guild.
+        guild_id: u64,
+    },
     /// Route information to sync a guild's integration.
     SyncGuildIntegration {
         /// The ID of the guild.
@@ -844,6 +867,15 @@ pub enum Route {
     },
     /// Route information to update a guild command.
     UpdateGuildCommand {
+        /// The ID of the owner application.
+        application_id: u64,
+        /// The ID of the command.
+        command_id: u64,
+        /// The ID of the guild.
+        guild_id: u64,
+    },
+    /// Route information to update a guild command permissions.
+    UpdateGuildCommandPermissions {
         /// The ID of the owner application.
         application_id: u64,
         /// The ID of the command.
@@ -1118,7 +1150,7 @@ impl Route {
                 guild_id,
             } => (
                 Method::DELETE,
-                Path::ApplicationGuildCommand(application_id),
+                Path::ApplicationGuildCommandId(application_id),
                 format!(
                     "applications/{}/guilds/{}/commands/{}",
                     application_id, guild_id, command_id
@@ -1348,6 +1380,16 @@ impl Route {
                     application_id, guild_id
                 )
                 .into(),
+            ),
+            Self::GetGuildCommandPermissions { application_id, guild_id, command_id } => (
+                Method::GET,
+                Path::ApplicationGuildCommandId(application_id),
+                format!("applications/{}/guilds/{}/commands/{}/permissions", application_id, guild_id, command_id).into()
+            ),
+            Self::GetGuildCommandsPermissions { application_id, guild_id } => (
+                Method::GET,
+                Path::ApplicationGuildCommand(application_id),
+                format!("applications/{}/guilds/{}/commands/permissions", application_id, guild_id).into()
             ),
             Self::GetGuildWidget { guild_id } => (
                 Method::GET,
@@ -1624,6 +1666,18 @@ impl Route {
                 )
                 .into(),
             ),
+            Self::SetGuildCommandsPermissions {
+                application_id,
+                guild_id,
+            } => (
+                Method::PUT,
+                Path::ApplicationGuildCommand(application_id),
+                format!(
+                    "applications/{}/guilds/{}/commands/permissions",
+                    application_id, guild_id
+                )
+                .into(),
+            ),
             Self::SyncGuildIntegration {
                 guild_id,
                 integration_id,
@@ -1675,9 +1729,22 @@ impl Route {
                 guild_id,
             } => (
                 Method::PATCH,
-                Path::ApplicationGuildCommand(application_id),
+                Path::ApplicationGuildCommandId(application_id),
                 format!(
                     "applications/{}/guilds/{}/commands/{}",
+                    application_id, guild_id, command_id
+                )
+                .into(),
+            ),
+            Self::UpdateGuildCommandPermissions {
+                application_id,
+                command_id,
+                guild_id,
+            } => (
+                Method::PUT,
+                Path::ApplicationGuildCommandId(application_id),
+                format!(
+                    "applications/{}/guilds/{}/commands/{}/permissions",
                     application_id, guild_id, command_id
                 )
                 .into(),

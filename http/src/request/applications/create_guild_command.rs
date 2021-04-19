@@ -38,12 +38,20 @@ impl<'a> CreateGuildCommand<'a> {
                 name,
                 description,
                 options: vec![],
+                default_permission: true
             },
             application_id,
             guild_id,
             fut: None,
             http,
         })
+    }
+
+    /// Set the default permission of the command
+    pub fn default_permission(mut self, default_permission: bool) -> Self {
+        self.command.default_permission = default_permission;
+
+        self
     }
 
     /// Add a command option.
