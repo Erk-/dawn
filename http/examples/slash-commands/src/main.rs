@@ -29,6 +29,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             description: "ping someone!".to_owned(),
             ..Default::default()
         })],
+        default_permission: true
     }];
 
     client
