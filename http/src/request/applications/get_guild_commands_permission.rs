@@ -1,12 +1,15 @@
 use super::InteractionError;
 use crate::request::prelude::*;
-use twilight_model::{id::{ApplicationId, GuildId}, applications::command::GuildCommandPermissions};
+use twilight_model::{
+    applications::command::GuildCommandPermissions,
+    id::{ApplicationId, GuildId},
+};
 
 pub struct GetGuildCommandsPermissions<'a> {
     application_id: ApplicationId,
     guild_id: GuildId,
     fut: Option<Pending<'a, Vec<GuildCommandPermissions>>>,
-    http: &'a Client
+    http: &'a Client,
 }
 
 impl<'a> GetGuildCommandsPermissions<'a> {
@@ -28,7 +31,7 @@ impl<'a> GetGuildCommandsPermissions<'a> {
     fn start(&mut self) -> Result<()> {
         let req = Request::from(Route::GetGuildCommandsPermissions {
             application_id: self.application_id.0,
-            guild_id: self.guild_id.0
+            guild_id: self.guild_id.0,
         });
         self.fut.replace(Box::pin(self.http.request(req)));
 
@@ -36,4 +39,7 @@ impl<'a> GetGuildCommandsPermissions<'a> {
     }
 }
 
-poll_req!(GetGuildCommandsPermissions<'_>, Vec<GuildCommandPermissions>);
+poll_req!(
+    GetGuildCommandsPermissions<'_>,
+    Vec<GuildCommandPermissions>
+);

@@ -36,7 +36,7 @@ impl<'a> CreateGlobalCommand<'a> {
                 name,
                 description,
                 options: vec![],
-                default_permission: true
+                default_permission: true,
             },
             application_id,
             fut: None,

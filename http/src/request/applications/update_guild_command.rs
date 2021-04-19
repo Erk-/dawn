@@ -14,7 +14,7 @@ struct UpdateGuildCommandFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     options: Option<Vec<CommandOption>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    default_permission: Option<bool>
+    default_permission: Option<bool>,
 }
 
 /// Edit a command in a guild, by ID.

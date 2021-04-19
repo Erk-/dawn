@@ -608,7 +608,7 @@ pub enum Route {
         /// The ID of the guild.
         guild_id: u64,
         /// The ID of the command.
-        command_id: u64
+        command_id: u64,
     },
     /// Route information to get permissions for all guild commands
     GetGuildCommandsPermissions {
@@ -1381,15 +1381,30 @@ impl Route {
                 )
                 .into(),
             ),
-            Self::GetGuildCommandPermissions { application_id, guild_id, command_id } => (
+            Self::GetGuildCommandPermissions {
+                application_id,
+                guild_id,
+                command_id,
+            } => (
                 Method::GET,
                 Path::ApplicationGuildCommandId(application_id),
-                format!("applications/{}/guilds/{}/commands/{}/permissions", application_id, guild_id, command_id).into()
+                format!(
+                    "applications/{}/guilds/{}/commands/{}/permissions",
+                    application_id, guild_id, command_id
+                )
+                .into(),
             ),
-            Self::GetGuildCommandsPermissions { application_id, guild_id } => (
+            Self::GetGuildCommandsPermissions {
+                application_id,
+                guild_id,
+            } => (
                 Method::GET,
                 Path::ApplicationGuildCommand(application_id),
-                format!("applications/{}/guilds/{}/commands/permissions", application_id, guild_id).into()
+                format!(
+                    "applications/{}/guilds/{}/commands/permissions",
+                    application_id, guild_id
+                )
+                .into(),
             ),
             Self::GetGuildWidget { guild_id } => (
                 Method::GET,

@@ -15,9 +15,8 @@ pub struct GuildCommandPermissions {
     pub application_id: Option<ApplicationId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guild_id: Option<GuildId>,
-    pub permissions: Vec<ApplicationCommandPermissions>
+    pub permissions: Vec<ApplicationCommandPermissions>,
 }
-
 
 /// Specifies what type of permission is enabled or disabled for a specific user or role
 ///
@@ -26,14 +25,8 @@ pub struct GuildCommandPermissions {
 /// [the discord docs]: https://discord.com/developers/docs/interactions/slash-commands#applicationcommandpermissions
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ApplicationCommandPermissions {
-    User {
-        id: UserId,
-        permission: bool
-    },
-    Role {
-        id: RoleId,
-        permission: bool
-    }
+    User { id: UserId, permission: bool },
+    Role { id: RoleId, permission: bool },
 }
 
 impl<'de> Deserialize<'de> for ApplicationCommandPermissions {
@@ -51,13 +44,17 @@ impl Serialize for ApplicationCommandPermissions {
         S: Serializer,
     {
         let (kind, id, permission) = match self {
-            ApplicationCommandPermissions::Role { id, permission } => (ApplicationCommandPermissionType::Role, id.0, *permission),
-            ApplicationCommandPermissions::User { id, permission } => (ApplicationCommandPermissionType::User, id.0, *permission)
+            ApplicationCommandPermissions::Role { id, permission } => {
+                (ApplicationCommandPermissionType::Role, id.0, *permission)
+            }
+            ApplicationCommandPermissions::User { id, permission } => {
+                (ApplicationCommandPermissionType::User, id.0, *permission)
+            }
         };
         ApplicationCommandPermissionsEnvelope {
             kind,
             id: GenericId(id),
-            permission
+            permission,
         }
         .serialize(serializer)
     }
@@ -68,7 +65,7 @@ struct ApplicationCommandPermissionsEnvelope {
     #[serde(rename = "type")]
     pub kind: ApplicationCommandPermissionType,
     pub id: GenericId,
-    pub permission: bool
+    pub permission: bool,
 }
 
 #[derive(
@@ -77,7 +74,7 @@ struct ApplicationCommandPermissionsEnvelope {
 #[repr(u8)]
 pub enum ApplicationCommandPermissionType {
     Role = 1,
-    User = 2
+    User = 2,
 }
 
 impl From<ApplicationCommandPermissionsEnvelope> for ApplicationCommandPermissions {
@@ -85,12 +82,12 @@ impl From<ApplicationCommandPermissionsEnvelope> for ApplicationCommandPermissio
         match envelope.kind {
             ApplicationCommandPermissionType::Role => Self::Role {
                 id: RoleId(envelope.id.0),
-                permission: envelope.permission
+                permission: envelope.permission,
             },
             ApplicationCommandPermissionType::User => Self::User {
                 id: UserId(envelope.id.0),
-                permission: envelope.permission
-            }
+                permission: envelope.permission,
+            },
         }
     }
 }

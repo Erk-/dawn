@@ -1,12 +1,15 @@
 use super::InteractionError;
 use crate::request::prelude::*;
-use twilight_model::{applications::command::ApplicationCommandPermissions, id::{ApplicationId, GuildId, CommandId}};
 use serde::Serialize;
+use twilight_model::{
+    applications::command::ApplicationCommandPermissions,
+    id::{ApplicationId, CommandId, GuildId},
+};
 
 #[derive(Debug, Default, Serialize)]
 pub struct UpdatePermissionsFields {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub permissions: Option<Vec<ApplicationCommandPermissions>>
+    pub permissions: Option<Vec<ApplicationCommandPermissions>>,
 }
 
 pub struct UpdateGuildCommandPermissions<'a> {
@@ -19,7 +22,8 @@ pub struct UpdateGuildCommandPermissions<'a> {
 }
 
 impl<'a> UpdateGuildCommandPermissions<'a> {
-    pub(crate) fn new(http: &'a Client,
+    pub(crate) fn new(
+        http: &'a Client,
         application_id: Option<ApplicationId>,
         guild_id: GuildId,
         command_id: CommandId,
@@ -32,7 +36,7 @@ impl<'a> UpdateGuildCommandPermissions<'a> {
             guild_id,
             fut: None,
             fields: UpdatePermissionsFields::default(),
-            http
+            http,
         })
     }
 
@@ -48,8 +52,8 @@ impl<'a> UpdateGuildCommandPermissions<'a> {
             Route::UpdateGuildCommandPermissions {
                 application_id: self.application_id.0,
                 command_id: self.command_id.0,
-                guild_id: self.guild_id.0
-            }
+                guild_id: self.guild_id.0,
+            },
         ));
         self.fut.replace(Box::pin(self.http.verify(req)));
 

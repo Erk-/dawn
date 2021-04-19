@@ -5,7 +5,7 @@ pub use option::{
     BaseCommandOptionData, ChoiceCommandOptionData, CommandOption, CommandOptionChoice,
     CommandOptionType, OptionsCommandOptionData,
 };
-pub use permissions::{GuildCommandPermissions, ApplicationCommandPermissions};
+pub use permissions::{ApplicationCommandPermissions, GuildCommandPermissions};
 
 use crate::id::{ApplicationId, CommandId};
 use serde::{Deserialize, Serialize};
@@ -30,7 +30,9 @@ pub struct Command {
     #[serde(default)]
     pub options: Vec<CommandOption>,
     #[serde(default = "default_permission")]
-    pub default_permission: bool
+    pub default_permission: bool,
 }
 
-fn default_permission() -> bool { true }
+fn default_permission() -> bool {
+    true
+}
