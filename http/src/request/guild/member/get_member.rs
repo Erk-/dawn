@@ -4,7 +4,7 @@ use crate::{
     request::{PendingOption, Request},
     routing::Route,
 };
-use hyper::StatusCode;
+use http::StatusCode;
 use serde::de::DeserializeSeed;
 use std::{
     future::Future,

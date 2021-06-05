@@ -1,10 +1,11 @@
 use crate::api_error::ApiError;
-use hyper::{Body, Response, StatusCode};
+use http::{Response, StatusCode};
 use std::{
     error::Error as StdError,
     fmt::{Display, Formatter, Result as FmtResult},
     result::Result as StdResult,
 };
+use bytes::Bytes;
 
 #[cfg(not(feature = "simd-json"))]
 use serde_json::Error as JsonError;
@@ -117,7 +118,7 @@ pub enum ErrorType {
     ///
     /// This may occur during Discord API stability incidents.
     ServiceUnavailable {
-        response: Response<Body>,
+        response: Response<()>,
     },
     /// Token in use has become revoked or is otherwise invalid.
     ///

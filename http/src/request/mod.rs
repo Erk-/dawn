@@ -35,7 +35,7 @@ macro_rules! poll_req {
                         let bytes = match fut.as_mut().poll(cx) {
                             Poll::Ready(Ok(bytes)) => bytes,
                             Poll::Ready(Err(e))
-                                if matches!(e.kind, crate::error::ErrorType::Response { status, .. } if status == hyper::StatusCode::NOT_FOUND) =>
+                                if matches!(e.kind, crate::error::ErrorType::Response { status, .. } if status == http::StatusCode::NOT_FOUND) =>
                             {
                                 return Poll::Ready(Ok(None));
                             }
@@ -90,7 +90,7 @@ pub use self::{
 
 use crate::error::{Error, ErrorType};
 use bytes::Bytes;
-use hyper::{
+use http::{
     header::{HeaderName, HeaderValue},
     Method as HyperMethod,
 };

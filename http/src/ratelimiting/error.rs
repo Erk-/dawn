@@ -1,4 +1,4 @@
-use hyper::header::ToStrError;
+use http::header::ToStrError;
 use std::{
     error::Error,
     fmt::{Display, Formatter, Result as FmtResult},

@@ -18,11 +18,13 @@ use crate::{
     API_VERSION,
 };
 use bytes::Bytes;
-use hyper::{
-    body::{self, Buf},
-    client::{Client as HyperClient, HttpConnector},
+use bytes::Buf;
+// use hyper::{
+//     body::{self, Buf},
+//     client::{Client as HyperClient, HttpConnector},
+use http::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT},
-    Body, Response, StatusCode,
+    Response, StatusCode,
 };
 use serde::de::DeserializeOwned;
 use std::{
@@ -35,6 +37,7 @@ use std::{
     time::Duration,
 };
 use tokio::time;
+use tokio::sync::Mutex;
 use twilight_model::{
     channel::message::allowed_mentions::AllowedMentions,
     guild::Permissions,
@@ -47,7 +50,7 @@ type HttpsConnector<T> = hyper_rustls::HttpsConnector<T>;
 type HttpsConnector<T> = hyper_tls::HttpsConnector<T>;
 
 struct State {
-    http: HyperClient<HttpsConnector<HttpConnector>, Body>,
+    http: Arc<Mutex<h3::client::Connection<h3_quinn::Connection<h3_quinn::quinn::crypto::rustls::TlsSession>>>>,
     default_headers: Option<HeaderMap>,
     proxy: Option<Box<str>>,
     ratelimiter: Option<Ratelimiter>,
@@ -61,7 +64,7 @@ struct State {
 impl Debug for State {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_struct("State")
-            .field("http", &self.http)
+            //.field("http", &self.http)
             .field("default_headers", &self.default_headers)
             .field("proxy", &self.proxy)
             .field("ratelimiter", &self.ratelimiter)
@@ -144,8 +147,8 @@ pub struct Client {
 impl Client {
     /// Create a new `hyper-rustls` or `hyper-tls` backed client with a token.
     #[cfg_attr(docsrs, doc(cfg(any(feature = "hyper-rustls", feature = "hyper-tls"))))]
-    pub fn new(token: impl Into<String>) -> Self {
-        ClientBuilder::default().token(token).build()
+    pub async fn new(token: impl Into<String>) -> Self {
+        ClientBuilder::default().token(token).build().await
     }
 
     /// Create a new builder to create a client.
@@ -1623,7 +1626,7 @@ impl Client {
     /// Returns an [`ErrorType::Unauthorized`] error type if the configured
     /// token has become invalid due to expiration, revokation, etc.
     #[allow(clippy::too_many_lines)]
-    pub async fn raw(&self, request: Request) -> Result<Response<Body>, Error> {
+    pub async fn raw(&self, request: Request) -> Result<(Response<()>, Option<Bytes>), Error> {
         if self.state.token_invalid.load(Ordering::Relaxed) {
             return Err(Error {
                 kind: ErrorType::Unauthorized,
@@ -1647,7 +1650,7 @@ impl Client {
         let url = format!("{}://{}/api/v{}/{}", protocol, host, API_VERSION, path);
         tracing::debug!("URL: {:?}", url);
 
-        let mut builder = hyper::Request::builder()
+        let mut builder = http::Request::builder()
             .method(method.into_hyper())
             .uri(&url);
 
@@ -1708,18 +1711,19 @@ impl Client {
         }
 
         let req = if let Some(form) = form {
-            let form_bytes = form.build();
+            let form_bytes: Bytes = form.build().into();
             if let Some(headers) = builder.headers_mut() {
                 headers.insert(CONTENT_LENGTH, form_bytes.len().into());
             };
             builder
-                .body(Body::from(form_bytes))
+                .body(form_bytes)
                 .map_err(|source| Error {
                     kind: ErrorType::BuildingRequest,
                     source: Some(Box::new(source)),
                 })?
         } else if let Some(bytes) = body {
-            builder.body(Body::from(bytes)).map_err(|source| Error {
+            let bytes: Bytes = bytes.into();
+            builder.body(bytes).map_err(|source| Error {
                 kind: ErrorType::BuildingRequest,
                 source: Some(Box::new(source)),
             })?
@@ -1728,33 +1732,40 @@ impl Client {
                 headers.insert(CONTENT_LENGTH, 0.into());
             }
 
-            builder.body(Body::empty()).map_err(|source| Error {
+            builder.body(Bytes::new()).map_err(|source| Error {
                 kind: ErrorType::BuildingRequest,
                 source: Some(Box::new(source)),
             })?
         } else {
-            builder.body(Body::empty()).map_err(|source| Error {
+            builder.body(Bytes::new()).map_err(|source| Error {
                 kind: ErrorType::BuildingRequest,
                 source: Some(Box::new(source)),
             })?
         };
 
-        let inner = self.state.http.request(req);
+        //let inner = self.state.http.request(req);
+        let req_body = req.body().clone();
+        let req = req.map(|_| ());
+        let mut http = self.state.http.lock().await;
+        let mut inner = http.send_request(req);
+
+        
         let fut = time::timeout(self.state.timeout, inner);
 
         let ratelimiter = match self.state.ratelimiter.as_ref() {
             Some(ratelimiter) => ratelimiter,
             None => {
-                return fut
-                    .await
-                    .map_err(|source| Error {
-                        kind: ErrorType::RequestTimedOut,
-                        source: Some(Box::new(source)),
-                    })?
-                    .map_err(|source| Error {
-                        kind: ErrorType::RequestError,
-                        source: Some(Box::new(source)),
-                    });
+                panic!();
+                // return fut
+                //     .await
+                //     .map_err(|source| Error {
+                //         kind: ErrorType::RequestTimedOut,
+                //         source: Some(Box::new(source)),
+                //     })?
+                //     .map_err(|source| Error {
+                //         kind: ErrorType::RequestError,
+                //         source: Some(Box::new(source)),
+                //     });
             }
         };
 
@@ -1764,7 +1775,7 @@ impl Client {
             source: Some(Box::new(source)),
         })?;
 
-        let resp = fut
+        let mut stream = fut
             .await
             .map_err(|source| Error {
                 kind: ErrorType::RequestTimedOut,
@@ -1774,6 +1785,10 @@ impl Client {
                 kind: ErrorType::RequestError,
                 source: Some(Box::new(source)),
             })?;
+
+        stream.send_data(req_body).await.unwrap();
+
+        let resp = stream.recv_response().await.unwrap();
 
         // If the API sent back an Unauthorized response, then the client's
         // configured token is permanently invalid and future requests must be
@@ -1793,7 +1808,9 @@ impl Client {
             }
         }
 
-        Ok(resp)
+        let data = stream.recv_data().await.unwrap();
+
+        Ok((resp, data))
     }
 
     /// Execute a request, chunking and deserializing the response.
@@ -1803,17 +1820,12 @@ impl Client {
     /// Returns an [`ErrorType::Unauthorized`] error type if the configured
     /// token has become invalid due to expiration, revokation, etc.
     pub async fn request<T: DeserializeOwned>(&self, request: Request) -> Result<T, Error> {
-        let resp = self.make_request(request).await?;
+        let (resp, mut _bytes) = self.make_request(request).await?;
 
-        let mut buf = body::aggregate(resp.into_body())
-            .await
-            .map_err(|source| Error {
-                kind: ErrorType::ChunkingResponse,
-                source: Some(Box::new(source)),
-            })?;
+        let mut _bytes = _bytes.unwrap();
 
-        let mut bytes = vec![0; buf.remaining()];
-        buf.copy_to_slice(&mut bytes);
+        let mut bytes = vec![0; _bytes.len()];
+        _bytes.copy_to_slice(&mut bytes);
 
         let result = crate::json::from_slice(&mut bytes);
 
@@ -1826,14 +1838,9 @@ impl Client {
     }
 
     pub(crate) async fn request_bytes(&self, request: Request) -> Result<Bytes, Error> {
-        let resp = self.make_request(request).await?;
-
-        hyper::body::to_bytes(resp.into_body())
-            .await
-            .map_err(|source| Error {
-                kind: ErrorType::ChunkingResponse,
-                source: Some(Box::new(source)),
-            })
+        let (_, bytes) = self.make_request(request).await?;
+        let bytes = bytes.unwrap();
+        Ok(bytes)
     }
 
     /// Execute a request, checking only that the response was a success.
@@ -1850,12 +1857,12 @@ impl Client {
         Ok(())
     }
 
-    async fn make_request(&self, request: Request) -> Result<Response<Body>, Error> {
-        let resp = self.raw(request).await?;
+    async fn make_request(&self, request: Request) -> Result<(Response<()>, Option<Bytes>), Error> {
+        let (resp, mut body) = self.raw(request).await?;
         let status = resp.status();
 
         if status.is_success() {
-            return Ok(resp);
+            return Ok((resp, body));
         }
 
         match status {
@@ -1873,15 +1880,17 @@ impl Client {
             _ => {}
         }
 
-        let mut buf = hyper::body::aggregate(resp.into_body())
-            .await
-            .map_err(|source| Error {
-                kind: ErrorType::ChunkingResponse,
-                source: Some(Box::new(source)),
-            })?;
+        // let mut buf = hyper::body::aggregate(resp.into_body())
+        //     .await
+        //     .map_err(|source| Error {
+        //         kind: ErrorType::ChunkingResponse,
+        //         source: Some(Box::new(source)),
+        //     })?;
 
-        let mut bytes = vec![0; buf.remaining()];
-        buf.copy_to_slice(&mut bytes);
+        let mut body = body.unwrap();
+        
+        let mut bytes = vec![0; body.len()];
+        body.copy_to_slice(&mut bytes);
 
         let error = crate::json::from_slice::<ApiError>(&mut bytes).map_err(|source| Error {
             kind: ErrorType::Parsing {

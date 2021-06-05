@@ -1,6 +1,6 @@
 use super::{Client, State};
 use crate::ratelimiting::Ratelimiter;
-use hyper::header::HeaderMap;
+use http::header::HeaderMap;
 use std::{
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
@@ -26,19 +26,55 @@ impl ClientBuilder {
     }
 
     /// Build the [`Client`].
-    pub fn build(self) -> Client {
-        #[cfg(feature = "rustls-native-roots")]
-        let connector = hyper_rustls::HttpsConnector::with_native_roots();
-        #[cfg(all(feature = "rustls-webpki-roots", not(feature = "rustls-native-roots")))]
-        let connector = hyper_rustls::HttpsConnector::with_webpki_roots();
-        #[cfg(all(
-            feature = "hyper-tls",
-            not(feature = "rustls-native-roots"),
-            not(feature = "rustls-webpki-roots")
-        ))]
-        let connector = hyper_tls::HttpsConnector::new();
+    pub async fn build(self) -> Client {
+        // #[cfg(feature = "rustls-native-roots")]
+        // let connector = hyper_rustls::HttpsConnector::with_native_roots();
+        // #[cfg(all(feature = "rustls-webpki-roots", not(feature = "rustls-native-roots")))]
+        // let connector = hyper_rustls::HttpsConnector::with_webpki_roots();
+        // #[cfg(all(
+        //     feature = "hyper-tls",
+        //     not(feature = "rustls-native-roots"),
+        //     not(feature = "rustls-webpki-roots")
+        // ))]
+        // let connector = hyper_tls::HttpsConnector::new();
+        //
+        // let http = hyper::client::Builder::default().build(connector);
 
-        let http = hyper::client::Builder::default().build(connector);
+        let dest = "https://discord.com";
+        
+        let dest = dest.parse::<http::Uri>().unwrap();
+        
+        let auth = dest
+            .authority()
+            .ok_or("destination must have a host").unwrap()
+        .clone();
+
+        let port = auth.port_u16().unwrap_or(443);
+
+        // dns me!
+        let addr = tokio::net::lookup_host((auth.host(), port))
+            .await.unwrap()
+        .next()
+            .ok_or("dns found no addresses").unwrap();
+
+            eprintln!("DNS Lookup for {:?}: {:?}", dest, addr);
+
+        // quinn setup
+        let mut client_config = h3_quinn::quinn::ClientConfigBuilder::default();
+        client_config.protocols(&[b"h3-29"]);
+
+        let mut client_endpoint_builder = h3_quinn::quinn::Endpoint::builder();
+        client_endpoint_builder.default_client_config(client_config.build());
+        let (client_endpoint, _) = client_endpoint_builder
+            .bind(&"[::]:0".parse().unwrap())
+            .unwrap();
+
+        let quinn_conn = h3_quinn::Connection::new(client_endpoint.connect(&addr, auth.host()).unwrap().await.unwrap());
+
+        // generic h3
+        let mut http = Arc::new(tokio::sync::Mutex::new(h3::client::Connection::new(quinn_conn).await.unwrap()));
+
+        eprintln!("QUIC connected ...");
 
         Client {
             state: Arc::new(State {

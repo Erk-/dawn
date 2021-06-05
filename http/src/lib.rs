@@ -81,8 +81,8 @@
     nonstandard_style,
     rust_2018_idioms,
     broken_intra_doc_links,
-    unused,
-    warnings
+    /*unused,
+    warnings*/
 )]
 #![allow(
     clippy::module_name_repetitions,
@@ -110,11 +110,11 @@ pub use crate::{client::Client, error::Error};
 #[allow(deprecated)]
 pub use crate::error::Result;
 
-#[cfg(not(any(
-    feature = "native",
-    feature = "rustls-native-roots",
-    feature = "rustls-webpki-roots"
-)))]
-compile_error!(
-    "Either the `native`, `rustls-native-roots` or `rustls-webpki-roots` feature must be enabled."
-);
+// #[cfg(not(any(
+//     feature = "native",
+//     feature = "rustls-native-roots",
+//     feature = "rustls-webpki-roots"
+// )))]
+// compile_error!(
+//     "Either the `native`, `rustls-native-roots` or `rustls-webpki-roots` feature must be enabled."
+// );

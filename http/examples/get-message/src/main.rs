@@ -8,13 +8,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Initialize the tracing subscriber.
     tracing_subscriber::fmt::init();
 
-    let client = Client::new(env::var("DISCORD_TOKEN")?);
-    let channel_id = ChannelId(381_926_291_785_383_946);
+    let client = Client::new(env::var("DISCORD_TOKEN")?).await;
+    let channel_id = ChannelId(745811002771374151);
 
     future::join_all((1u8..=10).map(|x| {
         client
             .create_message(channel_id)
-            .content(format!("Ping #{}", x))
+            .content(format!("HTTP/3 Ping #{}", x))
             .expect("content not a valid length")
     }))
     .await;

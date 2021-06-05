@@ -1,5 +1,5 @@
 use super::error::{RatelimitError, RatelimitErrorType, RatelimitResult};
-use hyper::header::{HeaderMap, HeaderValue};
+use http::header::{HeaderMap, HeaderValue};
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug)]
