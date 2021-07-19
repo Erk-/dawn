@@ -202,6 +202,9 @@ impl Display for ShardStartError {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match &self.kind {
             ShardStartErrorType::Establishing => f.write_str("establishing the connection failed"),
+            ShardStartErrorType::NoDomain => {
+                f.write_str("the URL provided by Discord had no domain")
+            }
             ShardStartErrorType::ParsingGatewayUrl { url } => {
                 f.write_str("the gateway url `")?;
                 f.write_str(url)?;
@@ -210,6 +213,10 @@ impl Display for ShardStartError {
             }
             ShardStartErrorType::RetrievingGatewayUrl => {
                 f.write_str("retrieving the gateway URL via HTTP failed")
+            }
+            #[cfg(feature = "native")]
+            ShardStartErrorType::TlsConnector => {
+                f.write_str("there was issues creating the TLS connector")
             }
         }
     }
@@ -229,6 +236,8 @@ impl Error for ShardStartError {
 pub enum ShardStartErrorType {
     /// Establishing a connection to the gateway failed.
     Establishing,
+    /// There was no domain on URL provided by Discord.
+    NoDomain,
     /// Parsing the gateway URL provided by Discord to connect to the gateway
     /// failed due to an invalid URL.
     ParsingGatewayUrl {
@@ -237,6 +246,9 @@ pub enum ShardStartErrorType {
     },
     /// Retrieving the gateway URL via the Twilight HTTP client failed.
     RetrievingGatewayUrl,
+    /// There was issues establishing the tls connection.
+    #[cfg(feature = "native")]
+    TlsConnector,
 }
 
 /// Information about a shard, including its latency, current session sequence,
@@ -476,9 +488,12 @@ impl Shard {
 
                     let new_kind = match kind {
                         ConnectingErrorType::Establishing => ShardStartErrorType::Establishing,
+                        ConnectingErrorType::NoDomain => ShardStartErrorType::NoDomain,
                         ConnectingErrorType::ParsingUrl { url } => {
                             ShardStartErrorType::ParsingGatewayUrl { url }
                         }
+                        #[cfg(all(feature = "native", not(feature = "rustls")))]
+                        ConnectingErrorType::TlsConnector => ShardStartErrorType::TlsConnector,
                     };
 
                     ShardStartError {

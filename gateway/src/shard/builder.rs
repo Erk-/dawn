@@ -1,5 +1,9 @@
 use super::{config::Config, Events, Shard};
 use crate::EventTypeFlags;
+#[cfg(feature = "native")]
+use native_tls::TlsConnector as NativeTlsConnector;
+#[cfg(feature = "rustls")]
+use rustls_tls::ClientConfig as RustlsTlsConnector;
 use std::{
     error::Error,
     fmt::{Display, Formatter, Result as FmtResult},
@@ -185,6 +189,10 @@ impl ShardBuilder {
             token: token.into_boxed_str(),
             session_id: None,
             sequence: None,
+            #[cfg(feature = "native")]
+            native_tls_connector: None,
+            #[cfg(feature = "rustls")]
+            rustls_tls_connector: None,
         })
     }
 
@@ -370,6 +378,27 @@ impl ShardBuilder {
         self.0.shard = [shard_id, shard_total];
 
         Ok(self)
+    }
+
+    /// Internal only
+    /// Set native_tls_connector.
+    #[cfg(feature = "native")]
+    pub(crate) fn native_tls_connector(mut self, native_tls_connector: NativeTlsConnector) -> Self {
+        self.0.native_tls_connector.replace(native_tls_connector);
+
+        self
+    }
+
+    /// Internal only
+    /// Set rustls_tls_connector.
+    #[cfg(feature = "rustls")]
+    pub(crate) fn rustls_tls_connector(
+        mut self,
+        rustls_tls_connector: Arc<RustlsTlsConnector>,
+    ) -> Self {
+        self.0.rustls_tls_connector.replace(rustls_tls_connector);
+
+        self
     }
 }
 

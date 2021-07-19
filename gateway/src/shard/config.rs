@@ -1,5 +1,9 @@
 use crate::EventTypeFlags;
-use std::sync::Arc;
+#[cfg(feature = "native")]
+use native_tls::TlsConnector as NativeTlsConnector;
+#[cfg(feature = "rustls")]
+use rustls_tls::ClientConfig as RustlsTlsConnector;
+use std::{fmt, sync::Arc};
 use twilight_gateway_queue::Queue;
 use twilight_http::Client;
 use twilight_model::gateway::{payload::update_presence::UpdatePresencePayload, Intents};
@@ -10,7 +14,7 @@ use twilight_model::gateway::{payload::update_presence::UpdatePresencePayload, I
 /// Use [`Shard::builder`] to start creating a configured shard.
 ///
 /// [`Shard::builder`]: super::Shard::builder
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Config {
     pub(crate) event_types: EventTypeFlags,
     pub(crate) gateway_url: Option<Box<str>>,
@@ -23,6 +27,34 @@ pub struct Config {
     pub(super) token: Box<str>,
     pub(crate) session_id: Option<Box<str>>,
     pub(crate) sequence: Option<u64>,
+    #[cfg(feature = "native")]
+    pub(crate) native_tls_connector: Option<NativeTlsConnector>,
+    #[cfg(feature = "rustls")]
+    pub(crate) rustls_tls_connector: Option<Arc<RustlsTlsConnector>>,
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut builder = f.debug_struct("Config");
+        builder.field("event_types", &self.event_types);
+        builder.field("gateway_url", &self.gateway_url);
+        builder.field("http_client", &self.http_client);
+        builder.field("intents", &self.intents);
+        builder.field("large_threashold", &self.large_threshold);
+        builder.field("presence", &self.presence);
+        builder.field("queue", &self.queue);
+        builder.field("shard", &self.shard);
+        builder.field("token", &self.token);
+        builder.field("session_id", &self.session_id);
+        builder.field("sequence", &self.sequence);
+        #[cfg(feature = "native")]
+        builder.field("native_tls_connector", &self.native_tls_connector);
+        if cfg!(feature = "rustls") {
+            builder.finish_non_exhaustive()
+        } else {
+            builder.finish()
+        }
+    }
 }
 
 impl Config {

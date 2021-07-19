@@ -11,6 +11,10 @@ use super::{
     socket_forwarder::SocketForwarder,
 };
 use crate::event::EventTypeFlags;
+#[cfg(feature = "native")]
+use native_tls::TlsConnector as NativeTlsConnector;
+#[cfg(feature = "rustls")]
+use rustls_tls::ClientConfig as RustlsTlsConnector;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -21,13 +25,19 @@ use std::{
     sync::{atomic::Ordering, Arc},
     time::Duration,
 };
-use tokio::sync::{
-    mpsc::UnboundedReceiver,
-    watch::{channel as watch_channel, Receiver as WatchReceiver, Sender as WatchSender},
+use tokio::{
+    net::TcpStream,
+    sync::{
+        mpsc::UnboundedReceiver,
+        watch::{channel as watch_channel, Receiver as WatchReceiver, Sender as WatchSender},
+    },
 };
-use tokio_tungstenite::tungstenite::{
-    protocol::{frame::coding::CloseCode, CloseFrame, WebSocketConfig},
-    Message,
+use tokio_tungstenite::{
+    tungstenite::{
+        protocol::{frame::coding::CloseCode, CloseFrame, WebSocketConfig},
+        Message,
+    },
+    Connector,
 };
 use twilight_model::gateway::{
     event::{
@@ -62,12 +72,15 @@ impl Display for ConnectingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match &self.kind {
             ConnectingErrorType::Establishing => f.write_str("failed to establish the connection"),
+            ConnectingErrorType::NoDomain => f.write_str("no domain present in the given URL"),
             ConnectingErrorType::ParsingUrl { url } => {
                 f.write_str("the gateway url `")?;
                 f.write_str(url)?;
 
                 f.write_str("` is invalid")
             }
+            #[cfg(all(feature = "native", not(feature = "rustls")))]
+            ConnectingErrorType::TlsConnector => f.write_str("failed to create TLS Connector"),
         }
     }
 }
@@ -85,7 +98,12 @@ impl Error for ConnectingError {
 #[non_exhaustive]
 pub enum ConnectingErrorType {
     Establishing,
-    ParsingUrl { url: String },
+    NoDomain,
+    ParsingUrl {
+        url: String,
+    },
+    #[cfg(all(feature = "native", not(feature = "rustls")))]
+    TlsConnector,
 }
 
 #[derive(Debug)]
@@ -306,7 +324,15 @@ impl ShardProcessor {
             gateway: url.clone(),
             shard_id: config.shard()[0],
         }));
-        let stream = Self::connect(&url).await?;
+
+        let stream = Self::connect(
+            &url,
+            #[cfg(feature = "native")]
+            config.native_tls_connector.clone(),
+            #[cfg(feature = "rustls")]
+            config.rustls_tls_connector.clone(),
+        )
+        .await?;
         let (forwarder, rx, tx) = SocketForwarder::new(stream);
         tokio::spawn(async move {
             forwarder.run().await;
@@ -840,12 +866,38 @@ impl ShardProcessor {
         Ok(())
     }
 
-    async fn connect(url: &str) -> Result<ShardStream, ConnectingError> {
+    async fn connect(
+        url: &str,
+        #[cfg(feature = "native")] native_tls_connector: Option<NativeTlsConnector>,
+        #[cfg(feature = "rustls")] rustls_tls_connector: Option<Arc<RustlsTlsConnector>>,
+    ) -> Result<ShardStream, ConnectingError> {
+        // Unused
+        #[cfg_attr(all(feature = "native", feature = "rustls"), allow(unused_variables))]
+        #[cfg(feature = "native")]
+        let native_tls_connector = native_tls_connector.map(|c| Connector::NativeTls(c));
+        #[cfg(feature = "rustls")]
+        let rustls_tls_connector = rustls_tls_connector.map(|c| Connector::Rustls(c));
+
         #[allow(disjoint_capture_migration)]
         let url = Url::parse(url).map_err(|source| ConnectingError {
             kind: ConnectingErrorType::ParsingUrl {
                 url: url.to_owned(),
             },
+            source: Some(Box::new(source)),
+        })?;
+
+        let domain = url.domain().ok_or(ConnectingError {
+            kind: ConnectingErrorType::NoDomain,
+            source: None,
+        })?;
+
+        let mut address = String::with_capacity(domain.len() + 4);
+        address.push_str(domain);
+        address.push_str(":443");
+
+        let try_socket = TcpStream::connect(address).await;
+        let socket = try_socket.map_err(|source| ConnectingError {
+            kind: ConnectingErrorType::Establishing,
             source: Some(Box::new(source)),
         })?;
 
@@ -861,12 +913,31 @@ impl ShardProcessor {
             max_send_queue: None,
         };
 
-        let (stream, _) = tokio_tungstenite::connect_async_with_config(url, Some(config))
-            .await
-            .map_err(|source| ConnectingError {
-                kind: ConnectingErrorType::Establishing,
-                source: Some(Box::new(source)),
-            })?;
+        #[cfg(all(feature = "native", not(feature = "rustls")))]
+        let (stream, _) = tokio_tungstenite::client_async_tls_with_config(
+            url,
+            socket,
+            Some(config),
+            native_tls_connector,
+        )
+        .await
+        .map_err(|source| ConnectingError {
+            kind: ConnectingErrorType::Establishing,
+            source: Some(Box::new(source)),
+        })?;
+
+        #[cfg(feature = "rustls")]
+        let (stream, _) = tokio_tungstenite::client_async_tls_with_config(
+            url,
+            socket,
+            Some(config),
+            rustls_tls_connector,
+        )
+        .await
+        .map_err(|source| ConnectingError {
+            kind: ConnectingErrorType::Establishing,
+            source: Some(Box::new(source)),
+        })?;
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Shook hands with remote");
@@ -920,7 +991,15 @@ impl ShardProcessor {
                 shard_id: self.config.shard()[0],
             }));
 
-            let stream = match Self::connect(&self.url).await {
+            let stream = match Self::connect(
+                &self.url,
+                #[cfg(feature = "native")]
+                self.config.native_tls_connector.clone(),
+                #[cfg(feature = "rustls")]
+                self.config.rustls_tls_connector.clone(),
+            )
+            .await
+            {
                 Ok(s) => s,
                 Err(_source) => {
                     #[cfg(feature = "tracing")]
@@ -989,7 +1068,14 @@ impl ShardProcessor {
             shard_id: self.config.shard()[0],
         }));
 
-        let stream = Self::connect(&self.url).await?;
+        let stream = Self::connect(
+            &self.url,
+            #[cfg(feature = "native")]
+            self.config.native_tls_connector.clone(),
+            #[cfg(feature = "rustls")]
+            self.config.rustls_tls_connector.clone(),
+        )
+        .await?;
 
         self.set_session(stream, Stage::Resuming);
 

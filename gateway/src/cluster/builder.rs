@@ -1,6 +1,6 @@
 use super::{
     config::Config as ClusterConfig,
-    r#impl::{Cluster, ClusterStartError},
+    r#impl::{Cluster, ClusterStartError, ClusterStartErrorType},
     scheme::ShardScheme,
 };
 use crate::{
@@ -8,6 +8,10 @@ use crate::{
     Event, EventTypeFlags,
 };
 use futures_util::stream::Stream;
+#[cfg(feature = "native")]
+use native_tls::TlsConnector as NativeTlsConnector;
+#[cfg(feature = "rustls")]
+use rustls_tls::ClientConfig as RustlsTlsConnector;
 use std::{collections::HashMap, sync::Arc};
 use twilight_gateway_queue::{LocalQueue, Queue};
 use twilight_http::Client;
@@ -95,7 +99,40 @@ impl ClusterBuilder {
             }
         }
 
-        self.0.shard_config = (self.1).0;
+        let shard_builder = self.1;
+
+        #[cfg(feature = "native")]
+        let native_connector = NativeTlsConnector::new().map_err(|source| ClusterStartError {
+            kind: ClusterStartErrorType::NativeTls,
+            source: Some(Box::new(source)),
+        })?;
+        #[cfg(feature = "native")]
+        let shard_builder = shard_builder.native_tls_connector(native_connector);
+
+        #[cfg(feature = "rustls")]
+        let rustls_connector = {
+            let mut config = RustlsTlsConnector::new();
+
+            #[cfg(feature = "rustls-native-roots")]
+            {
+                let native_certs =
+                    rustls_native_certs::load_native_certs().map_err(|err| ClusterStartError {
+                        kind: ClusterStartErrorType::NativeCerts,
+                        source: Some(Box::new(err.1)),
+                    })?;
+                config.root_store = native_certs;
+            }
+
+            #[cfg(feature = "rustls-webpki-roots")]
+            config
+                .root_store
+                .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+            config
+        };
+        #[cfg(feature = "rustls")]
+        let shard_builder = shard_builder.rustls_tls_connector(Arc::new(rustls_connector));
+
+        self.0.shard_config = shard_builder.0;
 
         Cluster::new_with_config(self.0).await
     }

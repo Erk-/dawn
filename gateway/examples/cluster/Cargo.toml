@@ -5,7 +5,7 @@ name = "twilight-gateway-example-cluster"
 version = "0.1.0"
 
 [dependencies]
-twilight-gateway = { path = "../.." }
+twilight-gateway = { path = "../..", default-features = false, features = ["compression", "native", "tracing"] }
 futures = "0.3"
 tracing-subscriber = "0.2"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
